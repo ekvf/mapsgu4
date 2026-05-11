@@ -15,9 +15,6 @@ let suggestView = null;
 /** Последние точки маршрута [старт, финиш] — для оценки расстояния «по прямой», если API не отдал метры. */
 let lastRouteReferencePoints = null;
 
-const NEARBY_STRAIGHT_METERS = 200;
-const VERY_NEARBY_METERS = 200;
-
 function buildingAddressLine(b) {
     return b.addressDisplay || b.address;
 }
@@ -220,8 +217,10 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/** Чтение выбранного режима из радиокнопок */
 function getRoutingMode() {
-    return 'masstransit';
+    var selected = document.querySelector('input[name="routingMode"]:checked');
+    return selected ? selected.value : 'masstransit';
 }
 
 function routingModeRu(mode) {
@@ -273,46 +272,7 @@ function transportTypeRu(t) {
     return m[k] || String(t);
 }
 
-function haversineDistanceMeters(pointA, pointB) {
-    if (!pointA || !pointB || pointA.length < 2 || pointB.length < 2) {
-        return null;
-    }
-    const R = 6371000;
-    const toRad = function (deg) {
-        return (deg * Math.PI) / 400;
-    };
-    const dLat = toRad(pointB[0] - pointA[0]);
-    const dLon = toRad(pointB[1] - pointA[1]);
-    const lat1 = toRad(pointA[0]);
-    const lat2 = toRad(pointB[0]);
-    const h =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-/** Расстояние маршрута в метрах из модели Яндекс.Карт или «по прямой» между точками. */
-function resolveRouteDistanceMeters(activeRoute) {
-    try {
-        const dist = activeRoute.properties.get('distance');
-        if (dist && typeof dist.value === 'number' && dist.value >= 0) {
-            return dist.value;
-        }
-    } catch (e) {
-        /* ignore */
-    }
-    if (
-        lastRouteReferencePoints &&
-        lastRouteReferencePoints.length === 2 &&
-        lastRouteReferencePoints[0] &&
-        lastRouteReferencePoints[1]
-    ) {
-        const air = haversineDistanceMeters(lastRouteReferencePoints[0], lastRouteReferencePoints[1]);
-        return air != null ? air : null;
-    }
-    return null;
-}
-
+/** Проверяет, есть ли в маршруте хотя бы один общественный транспорт */
 function masstransitRouteUsesPublicTransport(activeRoute) {
     let found = false;
     try {
@@ -330,67 +290,7 @@ function masstransitRouteUsesPublicTransport(activeRoute) {
     return found;
 }
 
-function buildWalkPreferenceTipHtml(activeRoute, routingMode) {
-    const m = resolveRouteDistanceMeters(activeRoute); // теперь корректно
-    const transitButNoVehicle =
-        routingMode === 'masstransit' && !masstransitRouteUsesPublicTransport(activeRoute);
-    const isNearby = m !== null && m <= NEARBY_STRAIGHT_METERS; // 200 м
-
-    if (routingMode === 'masstransit') {
-        // Случай 1: транспорта нет, и расстояние большое ( >200 м )
-        if (transitButNoVehicle && !isNearby) {
-            return (
-                '<div class="route-summary-tip route-summary-tip--warning">' +
-                '<strong>⚠️ Общественный транспорт не найден</strong><br>' +
-                'Яндекс.Карты не смогли проложить маршрут с автобусами/троллейбусами между этими точками. ' +
-                'Показан пешеходный маршрут (<strong>' + (m ? Math.round(m) + ' м' : 'дальний') + '</strong>). ' +
-                'Попробуйте режимы «На машине» или «Пешком».' +
-                '</div>'
-            );
-        }
-        // Случай 2: транспорта нет, но расстояние маленькое (≤200 м)
-        if (transitButNoVehicle && isNearby) {
-            return (
-                '<div class="route-summary-tip">' +
-                '<strong>🚶 Совет:</strong> до объекта очень близко (' + Math.round(m) + ' м) – ' +
-                'удобнее дойти пешком, чем ждать транспорт.' +
-                '</div>'
-            );
-        }
-        // Случай 3: транспорт есть, но расстояние маленькое (≤200 м)
-        if (!transitButNoVehicle && isNearby) {
-            return (
-                '<div class="route-summary-tip">' +
-                '<strong>🚶 Совет:</strong> до объекта всего ' + Math.round(m) + ' м – ' +
-                'возможно, проще пройти пешком, чем пользоваться общественным транспортом.' +
-                '</div>'
-            );
-        }
-        // Случай 4: транспорт есть, расстояние большое – совет не показываем
-    }
-
-    // Аналогично для auto и pedestrian
-    if (routingMode === 'auto' && isNearby) {
-        return (
-            '<div class="route-summary-tip">' +
-            '<strong>🚗 Рядом с целью:</strong> ' + Math.round(m) + ' м – ' +
-            'пройти пешком может быть проще, чем искать парковку.' +
-            '</div>'
-        );
-    }
-
-    if (routingMode === 'pedestrian' && isNearby) {
-        return (
-            '<div class="route-summary-tip">' +
-            '<strong>🚶 Совсем близко:</strong> ' + Math.round(m) + ' м – ' +
-            'удобно дойти пешком за пару минут.' +
-            '</div>'
-        );
-    }
-
-    return '';
-}
-
+/** Формирует список шагов (транспорт/пересадки) */
 function buildMasstransitStepsHtml(activeRoute) {
     const items = [];
     const maxSteps = 16;
@@ -446,64 +346,66 @@ function buildMasstransitStepsHtml(activeRoute) {
     );
 }
 
+/** Показывает панель с ошибкой маршрута (например, когда нет автобусов) */
+function updateRouteSummaryPanelForError(message) {
+    var el = document.getElementById('routeSummary');
+    if (!el) return;
+    el.hidden = false;
+    el.className = 'route-summary';
+    el.innerHTML = '<h4>Ошибка построения маршрута</h4><p>' + escapeHtml(message) + '</p>';
+}
+
+/** Обновляет сводку валидного маршрута */
 function updateRouteSummaryPanel(activeRoute, routingMode) {
     const el = document.getElementById('routeSummary');
     if (!el) return;
 
-    try {
-        if (!activeRoute) {
-            el.hidden = false;
-            el.className = 'route-summary route-summary--loading';
-            el.innerHTML =
-                '<h4>' +
-                escapeHtml(routingModeRu(routingMode)) +
-                '</h4><p>Ожидаем ответ от карт…</p>';
-            return;
-        }
-
-        if (activeRoute.properties.get('blocked')) {
-            el.hidden = false;
-            el.className = 'route-summary';
-            el.innerHTML =
-                '<h4>Маршрут недоступен</h4>' +
-                '<p>Для выбранного способа не удалось построить путь. Попробуйте другой вариант или уточните адрес отправления.</p>';
-            return;
-        }
-
-        const dist = activeRoute.properties.get('distance');
-        const dur = activeRoute.properties.get('duration');
-        let meta = '';
-        if (dur && dur.text) {
-            meta += '<strong>Время в пути:</strong> ' + escapeHtml(dur.text);
-        }
-        if (dist && dist.text) {
-            if (meta) {
-                meta += ' · ';
-            }
-            meta += '<strong>Расстояние:</strong> ' + escapeHtml(dist.text);
-        }
-
-        let body =
-            '<h4>' + escapeHtml(routingModeRu(routingMode)) + '</h4>' +
-            (meta ? '<p class="route-meta">' + meta + '</p>' : '');
-
-        body += buildWalkPreferenceTipHtml(activeRoute, routingMode);
-
-        if (routingMode === 'masstransit') {
-            body += buildMasstransitStepsHtml(activeRoute);
-        }
-
-        body +=
-            '<p class="route-muted">Расчёт Яндекс.Карт; расписание и остановки в реальности могут отличаться.</p>';
-
+    if (!activeRoute) {
         el.hidden = false;
-        el.className = 'route-summary';
-        el.innerHTML = body;
-    } catch (e2) {
-        el.hidden = false;
-        el.className = 'route-summary';
-        el.innerHTML = '<p>Не удалось прочитать данные маршрута.</p>';
+        el.className = 'route-summary route-summary--loading';
+        el.innerHTML =
+            '<h4>' +
+            escapeHtml(routingModeRu(routingMode)) +
+            '</h4><p>Ожидаем ответ от карт…</p>';
+        return;
     }
+
+    if (activeRoute.properties.get('blocked')) {
+        el.hidden = false;
+        el.className = 'route-summary';
+        el.innerHTML =
+            '<h4>Маршрут недоступен</h4>' +
+            '<p>Для выбранного способа не удалось построить путь. Попробуйте другой вариант или уточните адрес отправления.</p>';
+        return;
+    }
+
+    const dist = activeRoute.properties.get('distance');
+    const dur = activeRoute.properties.get('duration');
+    let meta = '';
+    if (dur && dur.text) {
+        meta += '<strong>Время в пути:</strong> ' + escapeHtml(dur.text);
+    }
+    if (dist && dist.text) {
+        if (meta) {
+            meta += ' · ';
+        }
+        meta += '<strong>Расстояние:</strong> ' + escapeHtml(dist.text);
+    }
+
+    let body =
+        '<h4>' + escapeHtml(routingModeRu(routingMode)) + '</h4>' +
+        (meta ? '<p class="route-meta">' + meta + '</p>' : '');
+
+    if (routingMode === 'masstransit') {
+        body += buildMasstransitStepsHtml(activeRoute);
+    }
+
+    body +=
+        '<p class="route-muted">Расчёт Яндекс.Карт; расписание и остановки в реальности могут отличаться.</p>';
+
+    el.hidden = false;
+    el.className = 'route-summary';
+    el.innerHTML = body;
 }
 
 function showBuildingInfo(building) {
@@ -663,6 +565,7 @@ document.getElementById('buildRoute').addEventListener('click', function () {
         return;
     }
 
+    // Удаляем предыдущий мультимаршрут
     if (multiRoute) {
         map.geoObjects.remove(multiRoute);
         multiRoute = null;
@@ -844,14 +747,30 @@ function buildRoute(startCoords, endCoords, routingMode) {
     }
 
     multiRoute.events.add('update', function () {
-        const activeRoute = multiRoute.getActiveRoute();
-        if (activeRoute) {
-            try {
-                map.setBounds(activeRoute.getWayPoints().getBounds(), { checkZoomRange: true });
-            } catch (eBounds) {
-                /* ignore */
-            }
+        var activeRoute = multiRoute.getActiveRoute();
+        if (!activeRoute) {
+            updateRouteSummaryPanel(null, routingMode);
+            return;
         }
+
+        // Попытка установить границы по точкам маршрута
+        try {
+            map.setBounds(activeRoute.getWayPoints().getBounds(), { checkZoomRange: true });
+        } catch (e) { /* игнорируем */ }
+
+        // Для режима "общественный транспорт" – строгая проверка наличия автобусов
+        if (routingMode === 'masstransit' && !masstransitRouteUsesPublicTransport(activeRoute)) {
+            // Удаляем пешеходный/неверный маршрут
+            map.geoObjects.remove(multiRoute);
+            multiRoute = null;
+            lastRouteReferencePoints = null;
+            updateRouteSummaryPanelForError(
+                'Не удалось построить маршрут на общественном транспорте. ' +
+                'Попробуйте выбрать «Пешком» или «На машине», либо измените начальную/конечную точку.'
+            );
+            return;
+        }
+
         updateRouteSummaryPanel(activeRoute, routingMode);
     });
 }
