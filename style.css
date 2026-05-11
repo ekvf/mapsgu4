@@ -9,6 +9,11 @@ body {
     background: rgb(130, 30, 40);
     min-height: 100vh;
     padding: 20px;
+    /* Поддержка safe-area для мобильных устройств */
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(20px + env(safe-area-inset-left, 0px));
+    padding-right: calc(20px + env(safe-area-inset-right, 0px));
 }
 
 .container {
@@ -17,7 +22,6 @@ body {
     background: white;
     border-radius: 15px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    /* Подсказки/выпадающие элементы не должны обрезаться по вертикали */
     overflow-x: hidden;
     overflow-y: visible;
 }
@@ -28,6 +32,8 @@ header {
     padding: 30px;
     text-align: center;
     box-shadow: 0 4px 15px rgba(130, 30, 40, 0.3);
+    /* Дополнительный отступ сверху для устройств с чёлкой */
+    padding-top: calc(30px + env(safe-area-inset-top, 0px));
 }
 
 header h1 {
@@ -153,7 +159,6 @@ header p {
     margin-right: 5px;
 }
 
-/* Стили для автодополнения Яндекс.Карт */
 .direct-search {
     z-index: 1000 !important;
 }
@@ -468,18 +473,14 @@ header p {
     display: block;
 }
 
-@media (max-width: 768px) {
-    .modal-building-hero {
-        margin: -4px -4px 14px;
-        width: calc(100% + 8px);
-        max-height: min(36vh, 220px);
-        border-radius: 8px;
-    }
-}
-
+/* ----- адаптация для планшетов и телефонов ----- */
 @media (max-width: 768px) {
     body {
         padding: 12px;
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        padding-left: calc(12px + env(safe-area-inset-left, 0px));
+        padding-right: calc(12px + env(safe-area-inset-right, 0px));
     }
 
     .container {
@@ -500,6 +501,7 @@ header p {
 
     header {
         padding: 20px;
+        padding-top: calc(20px + env(safe-area-inset-top, 0px));
     }
 
     .route-controls {
@@ -532,7 +534,7 @@ header p {
 
     .input-with-button input[type="text"] {
         padding: 12px 45px 12px 10px;
-        font-size: 16px; /* не даём мобильным браузерам зумить */
+        font-size: 16px; /* предотвращаем зум на iOS */
     }
 
     .input-group input[type="text"],
@@ -543,7 +545,7 @@ header p {
 
     .route-mode-option {
         min-height: 44px;
-        flex: 1 1 calc(50% - 8px);
+        flex: 1 1 calc(50% - 8px); /* две кнопки в ряду */
     }
 
     .modal-content {
@@ -553,15 +555,26 @@ header p {
         max-height: 82vh;
         overflow-y: auto;
     }
+
+    .modal-building-hero {
+        margin: -4px -4px 14px;
+        width: calc(100% + 8px);
+        max-height: min(36vh, 220px);
+        border-radius: 8px;
+    }
 }
 
+/* ----- ещё более узкие экраны (до 420px) ----- */
 @media (max-width: 420px) {
     .button-group {
         flex-direction: column;
+    }
+
+    .route-mode-option {
+        flex: 1 1 100%; /* три кнопки — одна под другой */
     }
 
     #useGeolocation {
         right: 3px;
     }
 }
-
