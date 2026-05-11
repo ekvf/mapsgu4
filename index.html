@@ -41,8 +41,28 @@
                         <option value="">Выберите корпус...</option>
                     </select>
                 </div>
+
+                <!-- НОВЫЙ БЛОК: переключатель способа передвижения -->
+                <fieldset class="route-mode-fieldset">
+                    <legend class="route-mode-legend">Способ передвижения</legend>
+                    <div class="route-mode-options">
+                        <label class="route-mode-option">
+                            <input type="radio" name="routingMode" value="masstransit" checked>
+                            🚌 Общественный транспорт
+                        </label>
+                        <label class="route-mode-option">
+                            <input type="radio" name="routingMode" value="pedestrian">
+                            🚶 Пешком
+                        </label>
+                        <label class="route-mode-option">
+                            <input type="radio" name="routingMode" value="auto">
+                            🚗 На машине
+                        </label>
+                    </div>
+                </fieldset>
+
                 <p class="input-group route-mode-hint" role="note">
-                    Маршрут всегда строится <strong>на общественном транспорте</strong> (автобус, троллейбус, трамвай и т.д. по данным Яндекс.Карт), независимо от расстояния.
+                    При выборе «Общественный транспорт» маршрут будет построен только если Яндекс.Карты находят автобус / троллейбус / трамвай.
                 </p>
                 <div id="routeSummary" class="route-summary" hidden aria-live="polite"></div>
                 <div class="button-group">
@@ -68,4 +88,3 @@
     <script src="boot-index.js" defer></script>
 </body>
 </html>
-
