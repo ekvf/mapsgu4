@@ -221,8 +221,8 @@ header p {
 .route-mode-option {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 12px;
+    gap: 4px;
+    padding: 12px 12px;
     border: 2px solid #ddd;
     border-radius: 8px;
     cursor: pointer;
@@ -247,8 +247,8 @@ header p {
 }
 
 .route-mode-option input {
-    width: 1.1em;
-    height: 1.1em;
+    width: 1em;
+    height: 1em;
     accent-color: rgb(255, 80, 80);
 }
 
