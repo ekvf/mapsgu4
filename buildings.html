@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Корпуса СГУ — информация</title>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="stylesheet" href="buildings.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Информация по корпусам СГУ</h1>
+            <p>На этой странице собрана только полезная информация по корпусам: адрес, назначение, контакты и режим работы.</p>
+            <a id="backToMapPage" class="back-link" href="index.html">Вернуться на страницу маршрутов</a>
+        </header>
+
+        <main class="content">
+            <section class="controls">
+                <div class="panel">
+                    <h2>Быстрый поиск корпуса</h2>
+                    <input id="searchInput" class="search" type="text" placeholder="Введите номер корпуса, адрес или ключевое слово...">
+                </div>
+                <div class="panel stats">
+                    <h2>Сводка</h2>
+                    <p><strong>Всего корпусов:</strong> <span id="totalCount">0</span></p>
+                    <p><strong>Показано сейчас:</strong> <span id="visibleCount">0</span></p>
+                </div>
+            </section>
+
+            <section id="buildingsGrid" class="buildings-grid"></section>
+            <div id="emptyState" class="empty-state">Ничего не найдено. Попробуйте другой запрос.</div>
+        </main>
+    </div>
+
+    <div id="buildingDetailOverlay" class="detail-overlay" role="dialog" aria-modal="true" aria-labelledby="detailTitle" aria-hidden="true">
+        <div class="detail-sheet">
+            <div class="detail-header">
+                <h2 id="detailTitle"></h2>
+                <button type="button" class="detail-close" id="detailCloseBtn" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="detail-body" id="detailBody"></div>
+        </div>
+    </div>
+
+    <script src="vk-init.js"></script>
+    <script src="buildings-data.js"></script>
+    <script>
+        var backToMapPage = document.getElementById("backToMapPage");
+        if (backToMapPage) {
+            backToMapPage.addEventListener("click", function(event) {
+                event.preventDefault();
+                window.location.assign("index.html");
+            });
+        }
+
+        const buildings =
+            typeof BUILDINGS_CATALOG !== "undefined" && BUILDINGS_CATALOG.length
+                ? BUILDINGS_CATALOG
+                : [];
+
+        function buildingAddressLine(b) {
+            return b.addressDisplay || b.address;
+        }
+
+        function escapeHtml(text) {
+            if (text === undefined || text === null) return "";
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function stripHtml(html) {
+            if (!html) return "";
+            const div = document.createElement("div");
+            div.innerHTML = html;
+            return div.textContent || div.innerText || "";
+        }
+
+        const buildingsGrid = document.getElementById("buildingsGrid");
+        const searchInput = document.getElementById("searchInput");
+        const totalCount = document.getElementById("totalCount");
+        const visibleCount = document.getElementById("visibleCount");
+        const emptyState = document.getElementById("emptyState");
+        const detailOverlay = document.getElementById("buildingDetailOverlay");
+        const detailTitle = document.getElementById("detailTitle");
+        const detailBody = document.getElementById("detailBody");
+        const detailCloseBtn = document.getElementById("detailCloseBtn");
+
+        function buildingDetailHeroHtml(building) {
+            if (!building.photo) {
+                return "";
+            }
+            var alt = "Вход в «" + building.name + "»";
+            return (
+                '<div class="detail-hero">' +
+                '<img src="' +
+                escapeHtml(building.photo) +
+                '" alt="' +
+                escapeHtml(alt) +
+                '" loading="eager" decoding="async">' +
+                '<div class="detail-hero-caption">Фото входа / фасада</div>' +
+                "</div>"
+            );
+        }
+
+        function buildBriefDetailHtml(building) {
+            const addr = buildingAddressLine(building);
+            return (
+                "<p><strong>Адрес:</strong> " +
+                escapeHtml(addr) +
+                "</p>" +
+                "<p><strong>Краткое описание:</strong> " +
+                escapeHtml(building.info.description) +
+                "</p>" +
+                '<p><strong class="detail-section-title">Структурные подразделения и инфраструктура</strong></p>' +
+                '<p class="detail-structure">' +
+                escapeHtml(building.info.structure) +
+                "</p>" +
+                "<p><strong>Режим работы:</strong> " +
+                escapeHtml(building.info.schedule) +
+                "</p>" +
+                "<p><strong>Контакты:</strong> " +
+                escapeHtml(building.info.contacts) +
+                "</p>"
+            );
+        }
+
+        function openBuildingDetail(building) {
+            detailTitle.textContent = building.name;
+
+            detailBody.innerHTML =
+                buildingDetailHeroHtml(building) +
+                buildBriefDetailHtml(building) +
+                '<div class="detail-long-block">' +
+                (building.detailHtml || "") +
+                "</div>";
+
+            detailOverlay.classList.add("is-open");
+            detailOverlay.setAttribute("aria-hidden", "false");
+            document.body.classList.add("detail-no-scroll");
+            detailCloseBtn.focus({ preventScroll: true });
+        }
+
+        function closeBuildingDetail() {
+            detailOverlay.classList.remove("is-open");
+            detailOverlay.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("detail-no-scroll");
+            detailBody.innerHTML = "";
+        }
+
+        detailCloseBtn.addEventListener("click", closeBuildingDetail);
+
+        detailOverlay.addEventListener("click", function (event) {
+            if (event.target === detailOverlay) {
+                closeBuildingDetail();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && detailOverlay.classList.contains("is-open")) {
+                closeBuildingDetail();
+            }
+        });
+
+        function createBuildingCard(building) {
+            const article = document.createElement("article");
+            article.className = "building-card";
+            article.setAttribute("tabindex", "0");
+            article.setAttribute("role", "button");
+            article.setAttribute("aria-label", "Подробнее: " + building.name);
+
+            const addr = buildingAddressLine(building);
+            var thumb = "";
+            if (building.photo) {
+                thumb =
+                    '<figure class="building-card-figure"><img class="building-card-img" src="' +
+                    escapeHtml(building.photo) +
+                    '" alt="' +
+                    escapeHtml("Вход: " + building.name) +
+                    '" loading="lazy" decoding="async"></figure>';
+            }
+            article.innerHTML =
+                thumb +
+                '<div class="building-card-content"><h3>' +
+                escapeHtml(building.name) +
+                "</h3>" +
+                "<p><strong>Адрес:</strong> " +
+                escapeHtml(addr) +
+                "</p>" +
+                "<p><strong>Краткое описание:</strong> " +
+                escapeHtml(building.info.description) +
+                "</p>" +
+                "<p><strong>Режим работы:</strong> " +
+                escapeHtml(building.info.schedule) +
+                "</p>" +
+                "<p><strong>Контакты:</strong> " +
+                escapeHtml(building.info.contacts) +
+                "</p>" +
+                '<p class="card-hint">Нажмите, чтобы открыть полную информацию</p></div>';
+
+            function activate() {
+                openBuildingDetail(building);
+            }
+
+            article.addEventListener("click", activate);
+            article.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    activate();
+                }
+            });
+
+            return article;
+        }
+
+        function renderBuildings(items) {
+            buildingsGrid.innerHTML = "";
+            items.forEach((building) => {
+                buildingsGrid.appendChild(createBuildingCard(building));
+            });
+
+            visibleCount.textContent = items.length;
+            emptyState.style.display = items.length === 0 ? "block" : "none";
+        }
+
+        function normalize(text) {
+            return text.toLowerCase().trim();
+        }
+
+        function filterBuildings(query) {
+            const q = normalize(query);
+            if (!q) {
+                return buildings;
+            }
+
+            return buildings.filter((building) => {
+                const searchText = [
+                    building.number,
+                    building.name,
+                    building.address,
+                    building.addressDisplay || "",
+                    building.info.description,
+                    building.info.structure,
+                    building.info.contacts,
+                    building.info.schedule,
+                    stripHtml(building.detailHtml)
+                ]
+                    .join(" ")
+                    .toLowerCase();
+
+                return searchText.includes(q);
+            });
+        }
+
+        searchInput.addEventListener("input", (event) => {
+            const filtered = filterBuildings(event.target.value);
+            renderBuildings(filtered);
+        });
+
+        totalCount.textContent = buildings.length;
+        renderBuildings(buildings);
+    </script>
+</body>
+</html>

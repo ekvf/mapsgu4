@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru" data-ymaps="https://api-maps.yandex.ru/2.1/?apikey=af46f260-f8fd-4f4d-9077-51e6f5a7671b&amp;lang=ru_RU">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Корпуса СГУ им. Питирима Сорокина</title>
+    <link rel="preconnect" href="https://api-maps.yandex.ru" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://mc.yandex.ru">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Наш сайт построит самый оптимальный маршрут до корпуса!</h1>
+             <p>Отметь свою точку на карте!</p>
+            <p><a id="openBuildingsPage" href="buildings.html" style="color:#fff; font-weight:600;">Перейти на страницу с информацией о корпусах</a></p>
+        </header>
+
+        <div class="controls">
+            <div class="route-controls">
+                <h3>Построить маршрут</h3>
+                <div class="input-group">
+                    <label for="startPoint">Начальная точка:</label>
+                    <div class="input-with-button">
+                        <input
+                            type="text"
+                            id="startPoint"
+                            placeholder="Город и адрес..."
+                            inputmode="search"
+                            autocomplete="off"
+                            autocapitalize="off"
+                            spellcheck="false">
+                        <button id="useGeolocation" type="button" title="Моё местоположение" aria-label="Моё местоположение">📍</button>
+                    </div>
+                    <div id="addressError" class="error-message" style="display: none;"></div>
+                </div>
+                <div class="input-group">
+                    <label for="endPoint">Корпус назначения:</label>
+                    <select id="endPoint">
+                        <option value="">Выберите корпус...</option>
+                    </select>
+                </div>
+                <p class="input-group route-mode-hint" role="note">
+                    Маршрут всегда строится <strong>на общественном транспорте</strong> (автобус, троллейбус, трамвай и т.д. по данным Яндекс.Карт), независимо от расстояния.
+                </p>
+                <div id="routeSummary" class="route-summary" hidden aria-live="polite"></div>
+                <div class="button-group">
+                    <button id="buildRoute" type="button">Построить маршрут</button>
+                    <button id="clearRoute" type="button">Очистить маршрут</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="map" class="map map--pending" aria-busy="true"></div>
+
+        <div id="infoModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="modalTitle"></h2>
+                <div id="modalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="buildings-data.js" defer></script>
+    <script src="vk-init.js" defer></script>
+    <script src="boot-index.js" defer></script>
+</body>
+</html>
+
